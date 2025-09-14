@@ -1,4 +1,4 @@
-broker: 192.168.80.51
-port: 1883
+broker: 172.22.112.251
+port: 2883
 topic: shake
-http_post: curl -k -POST 'https://sensorweb.us:8086/write?db=shake' -u test:sensorweb --data-binary '
+http_post: curl -k -POST 'https://sensorserver.engr.uga.edu:8086/write?db=shake' -u helena:helena --data-binary '

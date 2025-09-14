@@ -40,22 +40,23 @@ def write_influx(influx):
     
     # put into config file soon
     influxConfig = {}
-    influxConfig["influx_ip"] = 'https://sensorweb.us'
-    influxConfig["influx_user"] = 'test'
-    influxConfig["influx_pass"] =  'sensorweb'
-    
+    influxConfig["influx_ip"] = 'https://sensorserver.engr.uga.edu'
+    influxConfig["influx_user"] = 'helena'
+    influxConfig["influx_pass"] =  'helena'
+
     start_timestamp = influx['start_timestamp']
-    
+    interval = int(influx['interval'])/1e3
+    print(start_timestamp)
+    print(interval)   
     ## function to parse data
     http_post  = "curl -i -k -XPOST \'"+ influxConfig['influx_ip']+":8086/write?db="+influx['db_name']+"\' -u "+ influxConfig['influx_user']+":"+ influxConfig['influx_pass']+" --data-binary \' "
     count = 0
-    dataLength = len(influx['data'])
+    dataLength = len(influx['data']) 
     for value in influx['data']:
         count += 1
         http_post += "\n" + influx['table_name'] +",location=" + influx['mac_address'] + " "
         http_post += influx['data_name'] + "=" + str(value) + " " + str(int(start_timestamp*10e8))
-        start_timestamp +=  influx['interval']
-            
+        start_timestamp += interval
     http_post += "\'  &"
     print(http_post)
     subprocess.call(http_post, shell=True)
