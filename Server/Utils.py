@@ -1,105 +1,94 @@
-import paho.mqtt.client as mqtt
 import subprocess
-
-import yaml
 import time
-import numpy as np
+import json # NEW: Import the standard JSON library
+
+# MODIFIED: The function is renamed and completely rewritten to parse JSON.
+def parse_json_payload(message_string):
+    """
+    Parses the JSON payload from the M5Stick.
+    Transforms the JSON data into the dictionary format required by write_influx.
+    """
+    try:
+        # Decode the JSON string into a Python dictionary
+        parsed_json = json.loads(message_string)
+
+        # Build the dictionary that write_influx expects
+        returnDict = {
+            # Hardcode db_name and table_name as they are no longer in the payload
+            "db_name": "shake",
+            "table_name": "imu_data",
+
+            # Map keys from the JSON payload to the expected keys
+            "mac_address": parsed_json.get("mac"),
+            "start_timestamp": float(parsed_json.get("epoch", 0)),
+            "interval": float(parsed_json.get("interval_ms", 0)) / 1000.0, # Convert ms to seconds
+
+            # Copy the data arrays directly
+            "gyroX": parsed_json.get("gyroX", []),
+            "gyroY": parsed_json.get("gyroY", []),
+            "gyroZ": parsed_json.get("gyroZ", []),
+            "accX": parsed_json.get("accX", []),
+            "accY": parsed_json.get("accY", []),
+            "accZ": parsed_json.get("accZ", [])
+        }
+        return returnDict
+
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e}. Message: '{message_string[:100]}...'")
+        return None
+    except (TypeError, KeyError) as e:
+        print(f"Error accessing key in parsed JSON: {e}. Check payload structure.")
+        return None
 
 
-##
-##  testParse Functions
-##
+def write_influx(influx_data):
+    """
+    Writes the parsed sensor data to InfluxDB.
+    (This function remains unchanged as the input dictionary format is preserved).
+    """
+    if influx_data is None:
+        return
 
-# Turn the data String into a list
-def stringToList(dataString):
-    data = dataString.split(",")
-    return data
-
-# db_name, table_name, data_name, data, mac_address, start_timestamp, interval
-# shake    Z           value      1,2,3 00.00.00.00.00 1692491796.001 .001
-def parseString(exampleString):
-    returnDict = {}
+    influx_ip = 'https://sensorserver.engr.uga.edu'
+    influx_user = 'helena'
+    influx_pass = 'helena'
+    db_name = influx_data['db_name']
     
-    stringList = exampleString.split(" ")
+    table_map = {
+        'accX': 'X',
+        'accY': 'Y',
+        'accZ': 'Z',
+        'gyroX': 'gyroX',
+        'gyroY': 'gyroY',
+        'gyroZ': 'gyroZ'
+    }
 
-    # clean up the ints
-    returnDict["db_name"] = stringList[0]
-    returnDict["table_name"] = stringList[1]
-    returnDict["data_name"]  = stringList[2]
-    returnDict["data"] = stringToList(stringList[3])
-    returnDict["mac_address"] = stringList[4]
-    returnDict["start_timestamp"] = float(stringList[5])
-    returnDict["interval"] = float(stringList[6])
+    http_payload = ""
+    start_timestamp_ns = int(influx_data['start_timestamp'] * 1e9)
+    interval_ns = int(influx_data['interval'] * 1e9)
+    mac_address = influx_data['mac_address']
     
-    
-    return returnDict
-         
+    if 'accX' not in influx_data or not influx_data['accX']:
+        print("Warning: No data points found in the parsed message. Skipping InfluxDB write.")
+        return
         
-# New influx
-def write_influx(influx):
-    
-    # put into config file soon
-    influxConfig = {}
-    influxConfig["influx_ip"] = 'https://sensorserver.engr.uga.edu'
-    influxConfig["influx_user"] = 'helena'
-    influxConfig["influx_pass"] =  'helena'
+    num_points = len(influx_data['accX'])
 
-    start_timestamp = influx['start_timestamp']
-    interval = int(influx['interval'])/1e3
-    print(start_timestamp)
-    print(interval)   
-    ## function to parse data
-    http_post  = "curl -i -k -XPOST \'"+ influxConfig['influx_ip']+":8086/write?db="+influx['db_name']+"\' -u "+ influxConfig['influx_user']+":"+ influxConfig['influx_pass']+" --data-binary \' "
-    count = 0
-    dataLength = len(influx['data']) 
-    for value in influx['data']:
-        count += 1
-        http_post += "\n" + influx['table_name'] +",location=" + influx['mac_address'] + " "
-        http_post += influx['data_name'] + "=" + str(value) + " " + str(int(start_timestamp*10e8))
-        start_timestamp += interval
-    http_post += "\'  &"
-    print(http_post)
-    subprocess.call(http_post, shell=True)
-    print("printed to iflux!")
+    for i in range(num_points):
+        current_timestamp_ns = start_timestamp_ns + (i * interval_ns)
+        for key, table_name in table_map.items():
+            value = influx_data[key][i]
+            http_payload += f"{table_name},location={mac_address} value={value} {current_timestamp_ns}\n"
+            
+    http_post = (
+        f"curl -i -k -XPOST '{influx_ip}:8086/write?db={db_name}' "
+        f"-u '{influx_user}:{influx_pass}' --data-binary '{http_payload}'"
+    )
 
-
-
-##
-##  ExampleString Functions
-##
-
-def getEpochTime():
-    return round(time.time(), 3)
-
-def createSineWave(influx_packet,influx_frequency):
-    
-    maxTime = influx_packet * influx_frequency
-    DataValues = 10 * np.sin(2 * np.pi * np.linspace(0, maxTime, influx_packet) / 1)
-    DataValues = np.round(DataValues, decimals = 2)
-    
-    return DataValues
-
-def arrayToString(data):
-    returnDataString = ""
-    for i in range(len(data) - 2):
-        returnDataString += str(data[i]) + ","
-    
-    returnDataString += str(data[len(data)-1])
-    return returnDataString
-
-def getString():
-    returnString = "shake testData value "
-    returnString += arrayToString(createSineWave(200,.01))
-    returnString += " 00.00.00.00.00 "
-    returnString += str(getEpochTime())
-    returnString += " .01"
-    
-    return(returnString)
-
-
-
-
-
-
-
-    
+    try:
+        subprocess.call(http_post, shell=True, timeout=10)
+        print(f"Successfully wrote batch of {num_points} points to InfluxDB.")
+    except subprocess.TimeoutExpired:
+        print("Error: curl command timed out.")
+    except Exception as e:
+        print(f"An error occurred during InfluxDB write: {e}")

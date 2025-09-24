@@ -1,51 +1,69 @@
 import paho.mqtt.client as mqtt
 import threading
 from config import GetInfo
-from Utils import parseString, getString, write_influx
+# MODIFIED: Import the new parsing function
+from Utils import parse_json_payload, write_influx
+import time
+import queue
 
+message_queue = queue.Queue()
 
-# Create MQTT client
-client = mqtt.Client()
+def config():
+    values = GetInfo()
+    return values[0], values[1], values[2]
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected to MQTT broker")
-    client.subscribe(topic)
+    print("on_connect callback triggered.")
+    if rc == 0:
+        print("Connected to MQTT broker successfully.")
+        broker, port, topic = config()
+        print(f"Subscribing to topic: '{topic}'")
+        client.subscribe(topic, qos=1)
+    else:
+        print(f"Failed to connect, return code {rc}\n")
 
 def on_message(client, userdata, msg):
-    message = msg.payload.decode()
-    inputParam = message.split(" ")
-    if(inputParam[0] == "shake"): # Change if different table name
-        write_influx(parseString(message))
-    print(f"Received message: {message}")
+    try:
+        message_queue.put(msg.payload.decode())
+    except Exception as e:
+        print(f"Error putting message in queue: {e}")
 
-def mqtt_loop():
-    client.loop_forever()
+def database_worker():
+    while True:
+        try:
+            message = message_queue.get()
+            print(f"Worker processing message of length: {len(message)}. Queue size: {message_queue.qsize()}")
+            
+            # MODIFIED: Call the new JSON parsing function
+            parsed_data = parse_json_payload(message)
+            if parsed_data:
+                write_influx(parsed_data)
+            
+            message_queue.task_done()
+        except Exception as e:
+            print(f"Error in database_worker: {e}")
 
 def main():
-    config()
+    broker, port, topic = config()
+    client_id = f'python-mqtt-receiver-{int(time.time())}'
+    client = mqtt.Client(client_id=client_id, callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
+
+    print("--- Configuration ---")
+    print(f"Broker: {broker}, Port: {port}, Topic: {topic}")
+    print("---------------------")
     
     client.on_connect = on_connect
     client.on_message = on_message
 
     client.connect(broker, port, 60)
 
-    mqtt_thread = threading.Thread(target=mqtt_loop)
-    mqtt_thread.start()
+    worker_thread = threading.Thread(target=database_worker)
+    worker_thread.daemon = True
+    worker_thread.start()
+    print("Database worker thread started.")
 
-
-# Get the values from the yaml file
-def config():
-    global topic
-    global broker
-    global port
-    
-    values = GetInfo() 
-    
-    broker = values[0]
-    port = values[1]
-    topic = values[2]
-    
+    print("MQTT client started. Waiting for messages...")
+    client.loop_forever()
 
 if __name__ == '__main__':
-    config()
     main()

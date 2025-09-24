@@ -1,4 +1,4 @@
-broker: 172.22.112.251
-port: 2883
+broker: test.mosquitto.org
+port: 1883
 topic: shake
 http_post: curl -k -POST 'https://sensorserver.engr.uga.edu:8086/write?db=shake' -u helena:helena --data-binary '
