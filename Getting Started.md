@@ -37,26 +37,6 @@ python3 Test_MQTT_Send.py
 If the broker is running, the Test_MQTT_Recieve.py file should print "Hello World" to the console every three seconds.
 
 
-## Testing the MQTT and Curl Communication
-This demo replaces with M5 Stick-C with a python script. 
-
-The python script creates a sine wave and sends it to the server via MQTT. The MQTT_Reciever.py file recieves the message and writes it to the database. 
-
-1. Update config.yaml. Information can be found below.
-
-2. Run the Test_Arduino_Send.py file in a terminal window. 
-   
-```
-python3 Test_Arduino_Send.py
-```
-1. Run the MQTT_Reciever.py file in a **new** terminal window.
-
-```
-python3 MQTT_Reciever.py
-```
-
-If working properly, you should see a sine wave on the dashboard found [here](https://sensorweb.us:3000/d/M0m7iv6Vz/getting-started?orgId=1&from=now-5m&to=now&refresh=5s)
-
 ## Update the Config File (Config.yaml)
    
    Config.yaml contains all the information needed to connect to the broker.

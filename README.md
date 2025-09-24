@@ -63,16 +63,6 @@ The server hosts a number of files and programs for our project. They are attach
 
 📄 **config.py** -  This file contains contains a function to parse the config file. 
 
-📄 **Test_Arduino_Send.py** -  This file creates an example sine wave and sends it to the server via MQTT. This file acts inplace of the arduino.
-
-📄 **Test_MQTT_Recieve.py** -  This file subscribes to the topic in the config file and prints the message to the console.
-
-📄 **Test_MQTT_Send.py** -  This file subscribes to the topic in the config file and publishes the message "Hello world".
-
-
-## 📁 Test Files
-This Folder contains files that were used to test the M5 Stick-C and the Server. It included test file for EAP connection, a file to write to influxDB, headless configuration file for the M5 Stick-C. These files are a work in progress.
-
 
 ## Troubleshooting 
 1. If you are unsure if the broker is running, head to the broker dashboard after setting up the broker on the server at ipAddress:18083. If the dashboard webpage is not loading, then the broker is not running.
